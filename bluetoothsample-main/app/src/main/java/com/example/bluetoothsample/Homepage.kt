@@ -21,12 +21,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
-
-import com.example.bluetoothsample.BluetoothController
-import com.example.bluetoothsample.BluetoothDesk
-import com.example.bluetoothsample.BluetoothUiConnection
 
 
 class HomePage : ComponentActivity() { private val bluetoothController = BluetoothController()
@@ -43,7 +38,8 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     var showBluetoothContent by remember { mutableStateOf(false) }
     var showHomePage by remember { mutableStateOf(true) }
     var showPopup by remember { mutableStateOf(false) }
-    var streamDeckName by remember { mutableStateOf("") }
+    var shortcut_name by remember { mutableStateOf("") }
+    var shortcut_value by remember { mutableStateOf(0) }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -58,10 +54,18 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     showHomePage = false
                 }
             )
-            BluetoothDesk(bluetoothController)
-            if (streamDeckName.isNotEmpty()) {
-                Text(text = "Nom du Stream Deck : $streamDeckName")
+            if (shortcut_name.isNotEmpty()) {
+                Text(text = "Nom du Shortcut : $shortcut_name")
+                Text(text = "Valeur du Shortcut : $shortcut_value")
             }
+
+            MyBLEButton(
+                text = shortcut_name,
+                shortcut = 8,
+                onClick = { showPopup = true // To remove
+                }, bluetoothController
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -104,8 +108,9 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
         // Affichez la popup si showPopup est true
         if (showPopup) {
             StreamDeckDialog(
-                onCreateButtonClicked = { newName ->
-                    streamDeckName = newName
+                onCreateButtonClicked = { (name,shortcut) ->
+                    shortcut_name = name
+                    shortcut_value = shortcut.value
                     showPopup = false
                 },
                 onCancelButtonClicked = {
@@ -116,15 +121,22 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
 
     }
 }
+data class KeyboardShortcut(val name: String, val value: Int)
 
 @Composable
 fun StreamDeckDialog(
-    onCreateButtonClicked: (String) -> Unit,
+    onCreateButtonClicked: (Pair<String, KeyboardShortcut>) -> Unit,
     onCancelButtonClicked: () -> Unit
 ) {
     var enteredName by remember { mutableStateOf(TextFieldValue()) }
     var expanded by remember { mutableStateOf(false) }
-    var selectedShortcut by remember { mutableStateOf("Select a Shortcut") }
+    var clicked by remember { mutableStateOf(false) }
+
+    val keyboardShortcuts = KeyboardReport.KeyEventMap.map { (keyCode, value) ->
+        val name = KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
+        KeyboardShortcut(name, value)
+    }
+    var selectedShortcut by remember { mutableStateOf(keyboardShortcuts[0]) }
 
     AlertDialog(
         onDismissRequest = { onCancelButtonClicked() },
@@ -136,23 +148,22 @@ fun StreamDeckDialog(
                     onValueChange = { enteredName = it },
                     label = { Text("Nom du Stream Deck") }
                 )
-                val items = KeyboardReport.KeyEventMap.values.map { keyCode ->
-                    KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
-                }
+
                 DropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                 ) {
-                    items.forEach { shortcut ->
+                    keyboardShortcuts.forEach { shortcut ->
                         Box(
                             modifier = Modifier
                                 .clickable {
                                     selectedShortcut = shortcut
                                     expanded = false
+                                    clicked = true
                                 }
                                 .padding(8.dp)
                         ) {
-                            Text(text = shortcut)
+                            Text(text = shortcut.name)
                         }
                     }
                 }
@@ -160,15 +171,18 @@ fun StreamDeckDialog(
                 Button(
                     onClick = { expanded = true }
                 ) {
-                    Text(text = selectedShortcut)
-                }
+                    if (clicked) {
+                        Text(text = selectedShortcut.name)
+                    } else {
+                        Text(text = "Select a shortcut")
+                    }                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut != "Select a Shortcut") {
-                        onCreateButtonClicked("${enteredName.text} - $selectedShortcut")
+                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name.isNotEmpty()) {
+                        onCreateButtonClicked(Pair(enteredName.text, selectedShortcut))
                     } else {
                     }
                 }
@@ -191,6 +205,27 @@ fun StreamDeckDialog(
 @Composable
 fun MyButton(text: String, onClick: () -> Unit) {
     Button(onClick = onClick) {
+    Text(text = text)
+    }
+}
+@Composable
+fun MyBLEButton(text: String,shortcut: Int, onClick: () -> Unit, bluetoothController: BluetoothController? = null) {
+    var cpt by remember { mutableStateOf(false) }
+    println("MyBLEButton")
+
+    Button(onClick = {
+        println("MyBLEButton ++")
+
+        cpt = true;
+    }) {
         Text(text = text)
+    }
+    if (cpt) {
+        println("MyBLEButton GO")
+
+        if (bluetoothController != null) {
+            BluetoothDeskContainer(bluetoothController = bluetoothController,shortcut = shortcut)
+        }
+        cpt = false;
     }
 }

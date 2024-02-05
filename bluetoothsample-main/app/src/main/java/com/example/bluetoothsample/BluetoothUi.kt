@@ -49,81 +49,81 @@ fun BluetoothUiConnection(bluetoothController: BluetoothController) {
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
     }
-        if (isButtonInitVisible) {
+    if (isButtonInitVisible) {
+        Button(
+            onClick = { bluetoothController.init(context.applicationContext)
+                isButtonInitVisible = false }
+        ) {
+            Text(text = "Initialize Bluetooth device with HID profile")
+        }
+    }
+    else {
+
+        val btOn = bluetoothController.status is BluetoothController.Status.Connected
+        if(!btOn) {
             Button(
-                onClick = { bluetoothController.init(context.applicationContext)
-                            isButtonInitVisible = false }
+                onClick = { context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)) }
             ) {
-                Text(text = "Initialize Bluetooth device with HID profile")
+                Text(text = "discover and Pair new devices")
             }
         }
-        else {
-
-            val btOn = bluetoothController.status is BluetoothController.Status.Connected
-            if(!btOn) {
-                Button(
-                    onClick = { context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)) }
-                ) {
-                    Text(text = "discover and Pair new devices")
-                }
+        val waiting = bluetoothController.status is BluetoothController.Status.Waiting
+        val disconnected = bluetoothController.status is BluetoothController.Status.Disconnected
+        if (waiting or disconnected) {
+            Button(
+                onClick = { bluetoothController.connectHost() }
+            ) {
+                Text(text = "Bluetooth connect to host")
             }
-            val waiting = bluetoothController.status is BluetoothController.Status.Waiting
-            val disconnected = bluetoothController.status is BluetoothController.Status.Disconnected
-            if (waiting or disconnected) {
-                Button(
-                    onClick = { bluetoothController.connectHost() }
-                ) {
-                    Text(text = "Bluetooth connect to host")
-                }
-            }
-            Text(
-                //modifier=Modifier.align(Alignment.CenterHorizontally),
-                text = bluetoothController.status.display,
+        }
+        Text(
+            //modifier=Modifier.align(Alignment.CenterHorizontally),
+            text = bluetoothController.status.display,
 
             )
 
-            Icon(
-                if (btOn) Icons.Default.Bluetooth else Icons.Default.BluetoothDisabled,
-                "bluetooth",
-                modifier = Modifier.size(100.dp),
-                tint = if (btOn) Color.Blue else Color.Black,
-            )
-            if (btOn) {
-                Button(
-                    onClick = { bluetoothController.release()}
-                ) {
-                    Text(text = "Bluetooth disconnect from host")
-                }
+        Icon(
+            if (btOn) Icons.Default.Bluetooth else Icons.Default.BluetoothDisabled,
+            "bluetooth",
+            modifier = Modifier.size(100.dp),
+            tint = if (btOn) Color.Blue else Color.Black,
+        )
+        if (btOn) {
+            Button(
+                onClick = { bluetoothController.release()}
+            ) {
+                Text(text = "Bluetooth disconnect from host")
             }
-
-
         }
+
+
+    }
 }
-
-
 @Composable
-fun BluetoothDesk(bluetoothController: BluetoothController) {
+fun press(keyboardSender: KeyboardSender, shortcut: Shortcut, releaseModifiers: Boolean = true) {
+    @SuppressLint("MissingPermission")
 
-        val connected = bluetoothController.status as? BluetoothController.Status.Connected ?: return
+    val result = keyboardSender.sendKeyboard(shortcut.shortcutKey, shortcut.modifiers, releaseModifiers)
+    if (!result) Toast.makeText(    LocalContext.current, "can't find keymap for $shortcut", Toast.LENGTH_LONG).show()
+}
+/*
+@Composable
+fun BluetoothDesk(
+    bluetoothController: BluetoothController,
+    keyboardSender: KeyboardSender,
+) {
+    val context = LocalContext.current
+    val connected = bluetoothController.status as? BluetoothController.Status.Connected ?: return
 
-        val context = LocalContext.current
-        val keyboardSender = KeyboardSender(connected.btHidDevice, connected.hostDevice)
 
-
-        fun press(shortcut: Shortcut, releaseModifiers: Boolean = true) {
-            @SuppressLint("MissingPermission")
-            val result = keyboardSender.sendKeyboard(shortcut.shortcutKey, shortcut.modifiers, releaseModifiers)
-            if (!result) Toast.makeText(context,"can't find keymap for $shortcut",Toast.LENGTH_LONG).show()
-        }
-
-        Column( modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
 
             Spacer(modifier = Modifier.size(20.dp))
             Text("Slide Desk")
             Spacer(modifier = Modifier.size(10.dp))
 
             Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Button(onClick = { press(Shortcut(KeyEvent.KEYCODE_DPAD_LEFT)) }) {
+                Button(onClick = { press(keyboardSender,Shortcut(KeyEvent.KEYCODE_DPAD_LEFT)) }) {
                     Text("<-")
                 }
                 Spacer(modifier = Modifier.size(20.dp))
@@ -152,4 +152,12 @@ fun BluetoothDesk(bluetoothController: BluetoothController) {
                 }
             }
         }
+}*/
+
+@Composable
+fun BluetoothDeskContainer(bluetoothController: BluetoothController,shortcut: Int) {
+    val connected = bluetoothController.status as? BluetoothController.Status.Connected ?: return
+    val keyboardSender = KeyboardSender(connected.btHidDevice, connected.hostDevice)
+
+    press(keyboardSender,Shortcut(shortcut))
 }
