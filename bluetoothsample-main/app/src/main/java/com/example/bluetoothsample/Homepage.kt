@@ -97,20 +97,29 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
 
         // Affichez la popup si showPopup est true
         if (showPopup) {
-            StreamDeckDialog { newName ->
-                streamDeckName = newName
-                showPopup = false
-            }
+            StreamDeckDialog(
+                onCreateButtonClicked = { newName ->
+                    streamDeckName = newName
+                    showPopup = false
+                },
+                onCancelButtonClicked = {
+                    showPopup = false
+                }
+            )
         }
+
     }
 }
 
 @Composable
-fun StreamDeckDialog(onCreateButtonClicked: (String) -> Unit) {
+fun StreamDeckDialog(
+    onCreateButtonClicked: (String) -> Unit,
+    onCancelButtonClicked: () -> Unit
+) {
     var enteredName by remember { mutableStateOf(TextFieldValue()) }
 
     AlertDialog(
-        onDismissRequest = { /* Aucune action lors de la fermeture de la boîte de dialogue */ },
+        onDismissRequest = { onCancelButtonClicked() },
         title = { Text("Créer un nouveau Stream Deck") },
         text = {
             Column {
@@ -140,12 +149,15 @@ fun StreamDeckDialog(onCreateButtonClicked: (String) -> Unit) {
             }
         },
         dismissButton = {
-            Button(onClick = { /* Aucune action lors de l'annulation */ }) {
+            Button(onClick = {
+                onCancelButtonClicked()
+            }) {
                 Text("Annuler")
             }
         }
     )
 }
+
 
 @Composable
 fun MyButton(text: String, onClick: () -> Unit) {
