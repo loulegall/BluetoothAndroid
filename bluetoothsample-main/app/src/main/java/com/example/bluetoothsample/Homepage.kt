@@ -1,8 +1,10 @@
 package com.example.bluetoothsample
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
+
 import com.example.bluetoothsample.BluetoothController
 import com.example.bluetoothsample.BluetoothDesk
 import com.example.bluetoothsample.BluetoothUiConnection
@@ -117,6 +123,8 @@ fun StreamDeckDialog(
     onCancelButtonClicked: () -> Unit
 ) {
     var enteredName by remember { mutableStateOf(TextFieldValue()) }
+    var expanded by remember { mutableStateOf(false) }
+    var selectedShortcut by remember { mutableStateOf("Select a Shortcut") }
 
     AlertDialog(
         onDismissRequest = { onCancelButtonClicked() },
@@ -128,26 +136,47 @@ fun StreamDeckDialog(
                     onValueChange = { enteredName = it },
                     label = { Text("Nom du Stream Deck") }
                 )
+                val items = KeyboardReport.KeyEventMap.values.map { keyCode ->
+                    KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                ) {
+                    items.forEach { shortcut ->
+                        Box(
+                            modifier = Modifier
+                                .clickable {
+                                    selectedShortcut = shortcut
+                                    expanded = false
+                                }
+                                .padding(8.dp)
+                        ) {
+                            Text(text = shortcut)
+                        }
+                    }
+                }
+
                 Button(
-                    onClick = { /*TODO*/ }) {
-                    Text(text = "Shortcut")
+                    onClick = { expanded = true }
+                ) {
+                    Text(text = selectedShortcut)
                 }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (!enteredName.text.isNullOrEmpty()) {
-                        onCreateButtonClicked(enteredName.text)
+                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut != "Select a Shortcut") {
+                        onCreateButtonClicked("${enteredName.text} - $selectedShortcut")
                     } else {
-                        // Affichez un message d'erreur si le nom est vide
-                        // Ici, vous pouvez remplacer par un Toast ou Snackbar
                     }
                 }
             ) {
                 Text("Créer")
             }
         },
+
         dismissButton = {
             Button(onClick = {
                 onCancelButtonClicked()
