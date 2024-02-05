@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -32,7 +34,6 @@ class HomePage : ComponentActivity() { private val bluetoothController = Bluetoo
         }
     }
 }
-
 @Composable
 fun HomePageContent(bluetoothController: BluetoothController, activity: ComponentActivity) {
     var showBluetoothContent by remember { mutableStateOf(false) }
@@ -40,6 +41,8 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     var showPopup by remember { mutableStateOf(false) }
     var shortcut_name by remember { mutableStateOf("") }
     var shortcut_value by remember { mutableStateOf(0) }
+
+    var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String,KeyboardShortcut>>()) }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -59,12 +62,17 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                 Text(text = "Valeur du Shortcut : $shortcut_value")
             }
 
-            MyBLEButton(
-                text = shortcut_name,
-                shortcut = 8,
-                onClick = { showPopup = true // To remove
-                }, bluetoothController
-            )
+            LazyColumn {
+                items(buttonsList) { (name, shortcut) ->
+                    MyBLEButton(
+                        text = name,
+                        shortcut = shortcut.value,
+                        onClick = {
+                        },
+                        bluetoothController
+                    )
+                }
+            }
 
             Box(
                 modifier = Modifier
@@ -80,6 +88,7 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
                 }
             }
+
         } else {
             // Page Bluetooth
             Surface(
@@ -112,6 +121,8 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     shortcut_name = name
                     shortcut_value = shortcut.value
                     showPopup = false
+                    val defaultButton = Pair(name, KeyboardShortcut(shortcut_name,shortcut_value)) // Remplacez le nom et la valeur par défaut
+                    buttonsList.add(defaultButton)
                 },
                 onCancelButtonClicked = {
                     showPopup = false
@@ -121,6 +132,7 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
 
     }
 }
+
 data class KeyboardShortcut(val name: String, val value: Int)
 
 @Composable
@@ -136,7 +148,7 @@ fun StreamDeckDialog(
         val name = KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
         KeyboardShortcut(name, value)
     }
-    var selectedShortcut by remember { mutableStateOf(keyboardShortcuts[0]) }
+    var selectedShortcut by remember { mutableStateOf( KeyboardShortcut("Unknown", -1)) }
 
     AlertDialog(
         onDismissRequest = { onCancelButtonClicked() },
@@ -181,7 +193,8 @@ fun StreamDeckDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name.isNotEmpty()) {
+                    println("selected value: ${selectedShortcut.value}")
+                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name != "Unknown" && selectedShortcut.value != -1 ) {
                         onCreateButtonClicked(Pair(enteredName.text, selectedShortcut))
                     } else {
                     }
@@ -208,6 +221,28 @@ fun MyButton(text: String, onClick: () -> Unit) {
     Text(text = text)
     }
 }
+
+@Composable
+fun ButtonList(buttonsList: List<Pair<String, KeyboardShortcut>>, bluetoothController: BluetoothController?) {
+    println("ButtonList")
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        for ((name, shortcut) in buttonsList) {
+            MyBLEButton(
+                text = name,
+                shortcut = shortcut.value,
+                onClick = {
+                },
+                bluetoothController
+            )
+        }
+    }
+}
+
+
 @Composable
 fun MyBLEButton(text: String,shortcut: Int, onClick: () -> Unit, bluetoothController: BluetoothController? = null) {
     var cpt by remember { mutableStateOf(false) }
