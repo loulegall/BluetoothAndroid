@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,7 +50,7 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     var shortcut_value by remember { mutableStateOf(0) }
 
     var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String,KeyboardShortcut>>()) }
-
+    var lastButtonId by remember { mutableStateOf(0L) }
     val database = Room.databaseBuilder(
         activity.applicationContext,
         AppDatabase::class.java, "app-database"
@@ -63,6 +64,11 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
             buttonsList = savedButtons.map { buttonEntity ->
                 Pair(buttonEntity.buttonName, KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue))
             }.toMutableList()
+            // get the last button id
+            val lastButton = savedButtons.lastOrNull()
+            if (lastButton != null) {
+                lastButtonId = lastButton.id
+            }
         }
         onDispose {
             // Sauvegarder les boutons dans la base de données lors de la destruction du Composable
@@ -110,12 +116,28 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     .padding(16.dp),
                 contentAlignment = Alignment.BottomEnd
             ) {
+                Row {
+                    Button(onClick = {
+                        // Supprimer le dernier bouton de la liste
+                        if (buttonsList.isNotEmpty()) {
+                            val lastButton = buttonsList.removeLast()
+                            // Supprimer le dernier bouton de la base de données
+                            activity.lifecycleScope.launch {
+                                buttonDao.deleteButton(ButtonEntity(lastButtonId, lastButton.first, lastButton.second.name, lastButton.second.value))
+                            }
+                            lastButtonId -= 1
+                        }
+                    }) {
+                        Text(text = "DELETE LAST")
+                    }
+
                 FloatingActionButton(
                     onClick = {
                         showPopup = true
                     }
                 ) {
                     Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
+                }
                 }
             }
 
@@ -280,18 +302,13 @@ fun ButtonList(buttonsList: List<Pair<String, KeyboardShortcut>>, bluetoothContr
 @Composable
 fun MyBLEButton(text: String,shortcut: Int, onClick: () -> Unit, bluetoothController: BluetoothController? = null) {
     var cpt by remember { mutableStateOf(false) }
-    println("MyBLEButton")
 
     Button(onClick = {
-        println("MyBLEButton ++")
-
         cpt = true;
     }) {
         Text(text = text)
     }
     if (cpt) {
-        println("MyBLEButton GO")
-
         if (bluetoothController != null) {
             BluetoothDeskContainer(bluetoothController = bluetoothController,shortcut = shortcut)
         }
