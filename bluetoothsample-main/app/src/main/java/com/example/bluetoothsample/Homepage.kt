@@ -10,10 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -27,19 +25,48 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Button
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import kotlinx.coroutines.launch
 
-class HomePage : ComponentActivity() { private val bluetoothController = BluetoothController()
+class HomePage : ComponentActivity() {
+    private val bluetoothController = BluetoothController()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             HomePageContent(bluetoothController, this)
         }
     }
+}
+
+data class KeyboardShortcut(val name: String, val value: Int)
+
+data class StreamDeckList(
+    val name: String,
+    val subElements: List<KeyboardShortcut>,
+    var isSelected: Boolean = false
+)
+fun getDefaultStreamDeck(): List<StreamDeckList> {
+    return listOf(
+        StreamDeckList(
+            "Function",
+            listOf(
+                KeyboardShortcut("F1", 58),
+                KeyboardShortcut("F2", 59),
+                KeyboardShortcut("F3", 60),
+                KeyboardShortcut("F4", 61)
+            )
+        ),
+        StreamDeckList(
+            "Arrow",
+            listOf(
+                KeyboardShortcut("->", 79),
+                KeyboardShortcut("<-", 80),
+                KeyboardShortcut("^", 81),
+                KeyboardShortcut("v", 82)
+            )
+        )
+    )
 }
 
 
@@ -51,7 +78,7 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     var shortcut_name by remember { mutableStateOf("") }
     var shortcut_value by remember { mutableStateOf(0) }
 
-    var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String,KeyboardShortcut>>()) }
+    var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String, KeyboardShortcut>>()) }
     var lastButtonId by remember { mutableStateOf(0L) }
     val database = Room.databaseBuilder(
         activity.applicationContext,
@@ -59,15 +86,15 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     ).build()
     val buttonDao = database.buttonDao()
 
-    var showDeckInfos by remember { mutableStateOf(false) }
-
-    showDeckInfos
     DisposableEffect(Unit) {
         // Récupérer les boutons de la base de données lors de la création du Composable
         activity.lifecycleScope.launch {
             val savedButtons = buttonDao.getAllButtons()
             buttonsList = savedButtons.map { buttonEntity ->
-                Pair(buttonEntity.buttonName, KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue))
+                Pair(
+                    buttonEntity.buttonName,
+                    KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue)
+                )
             }.toMutableList()
             // get the last button id
             val lastButton = savedButtons.lastOrNull()
@@ -79,7 +106,14 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
             // Sauvegarder les boutons dans la base de données lors de la destruction du Composable
             buttonsList.forEach { (buttonName, shortcutName) ->
                 activity.lifecycleScope.launch {
-                    buttonDao.insertButton(ButtonEntity(0L, buttonName, shortcutName.name, shortcutName.value))
+                    buttonDao.insertButton(
+                        ButtonEntity(
+                            0L,
+                            buttonName,
+                            shortcutName.name,
+                            shortcutName.value
+                        )
+                    )
                 }
             }
         }
@@ -108,43 +142,41 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     MyBLEButton(
                         text = name,
                         shortcut = shortcut.value,
-                        onClick = {},
                         bluetoothController = bluetoothController,
-                        updateShowStates = {
-                            showDeckInfos = true
-                            showHomePage = true
-                        }
                     )
                 }
             }
+            Text(
+                text = "Default Stream Deck",
+                modifier = Modifier.padding(16.dp)
+            )
 
-            if (showDeckInfos) {
-                // Afficher le titre et la grille uniquement si showDeckInfos est vrai
-                Text(text = "Deck Buttons") // Titre "Deck Buttons"
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    (1..3).forEach { number -> // LINK BLE BUTTONS
-                        Button(
-                            onClick = {
-                                // TODO : Action à effectuer lors du clic sur le bouton
-                            }
-                        ) {
-                            Text(text = number.toString())
-                        }
+            val myList by remember { mutableStateOf(getDefaultStreamDeck()) }
+
+            for (element in myList) {
+                var isSelected by remember { mutableStateOf(element.isSelected) }
+
+                Button(
+                    onClick = {
+                        isSelected = !isSelected
+                        element.isSelected = isSelected
                     }
-                    Button(
-                        onClick = {
-                            showDeckInfos = false
-                        }
+                ) {
+                    Text(text = element.name)
+                }
+
+                if (isSelected) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(text = "CLOSE DECK")
+                        for (subElement in element.subElements) {
+                            MyBLEButton(text = subElement.name, shortcut = subElement.value, bluetoothController = bluetoothController)
+                        }
                     }
                 }
             }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -158,7 +190,14 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                             val lastButton = buttonsList.removeLast()
                             // Supprimer le dernier bouton de la base de données
                             activity.lifecycleScope.launch {
-                                buttonDao.deleteButton(ButtonEntity(lastButtonId, lastButton.first, lastButton.second.name, lastButton.second.value))
+                                buttonDao.deleteButton(
+                                    ButtonEntity(
+                                        lastButtonId,
+                                        lastButton.first,
+                                        lastButton.second.name,
+                                        lastButton.second.value
+                                    )
+                                )
                             }
                             lastButtonId -= 1
                         }
@@ -207,12 +246,22 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     shortcut_name = name
                     shortcut_value = shortcut.value
                     showPopup = false
-                    val defaultButton = Pair(name, KeyboardShortcut(shortcut_name, shortcut_value)) // Remplacez le nom et la valeur par défaut
+                    val defaultButton = Pair(
+                        name,
+                        KeyboardShortcut(shortcut_name, shortcut_value)
+                    ) // Remplacez le nom et la valeur par défaut
                     buttonsList.add(defaultButton)
                     // Add the button to the local storage
                     buttonsList.forEach { (buttonName, shortcutName) ->
                         activity.lifecycleScope.launch {
-                            buttonDao.insertButton(ButtonEntity(0L, buttonName, shortcutName.name, shortcutName.value))
+                            buttonDao.insertButton(
+                                ButtonEntity(
+                                    0L,
+                                    buttonName,
+                                    shortcutName.name,
+                                    shortcutName.value
+                                )
+                            )
                         }
                     }
                 },
@@ -225,7 +274,6 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
 
 }
 
-data class KeyboardShortcut(val name: String, val value: Int)
 
 @Composable
 fun StreamDeckDialog(
@@ -240,7 +288,7 @@ fun StreamDeckDialog(
         val name = KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
         KeyboardShortcut(name, value)
     }
-    var selectedShortcut by remember { mutableStateOf( KeyboardShortcut("Unknown", -1)) }
+    var selectedShortcut by remember { mutableStateOf(KeyboardShortcut("Unknown", -1)) }
 
     AlertDialog(
         onDismissRequest = { onCancelButtonClicked() },
@@ -279,13 +327,14 @@ fun StreamDeckDialog(
                         Text(text = selectedShortcut.name)
                     } else {
                         Text(text = "Select a shortcut")
-                    }                }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name != "Unknown" && selectedShortcut.value != -1 ) {
+                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name != "Unknown" && selectedShortcut.value != -1) {
                         onCreateButtonClicked(Pair(enteredName.text, selectedShortcut))
                     } else {
                     }
@@ -314,33 +363,10 @@ fun MyButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun ButtonList(buttonsList: List<Pair<String, KeyboardShortcut>>, bluetoothController: BluetoothController?) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        for ((name, shortcut) in buttonsList) {
-            MyBLEButton(
-                text = name,
-                shortcut = shortcut.value,
-                onClick = {
-                },
-                bluetoothController,
-                updateShowStates = {
-                }
-            )
-        }
-    }
-}
-
-
-@Composable
 fun MyBLEButton(
     text: String,
     shortcut: Int,
-    onClick: () -> Unit,
     bluetoothController: BluetoothController? = null,
-    updateShowStates: () -> Unit
 ) {
     var cpt by remember { mutableStateOf(false) }
 
@@ -352,9 +378,8 @@ fun MyBLEButton(
 
     if (cpt) {
         if (bluetoothController != null) {
+            println("Sending the shortcut $shortcut")
             BluetoothDeskContainer(bluetoothController = bluetoothController, shortcut = shortcut)
-            // Mettre à jour les états showDeckInfos et showHomePage
-            updateShowStates()
         }
         cpt = false
     }
