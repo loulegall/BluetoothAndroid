@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -57,6 +59,9 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     ).build()
     val buttonDao = database.buttonDao()
 
+    var showDeckInfos by remember { mutableStateOf(false) }
+
+    showDeckInfos
     DisposableEffect(Unit) {
         // Récupérer les boutons de la base de données lors de la création du Composable
         activity.lifecycleScope.launch {
@@ -103,13 +108,43 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     MyBLEButton(
                         text = name,
                         shortcut = shortcut.value,
-                        onClick = {
-                        },
-                        bluetoothController
+                        onClick = {},
+                        bluetoothController = bluetoothController,
+                        updateShowStates = {
+                            showDeckInfos = true
+                            showHomePage = true
+                        }
                     )
                 }
             }
 
+            if (showDeckInfos) {
+                // Afficher le titre et la grille uniquement si showDeckInfos est vrai
+                Text(text = "Deck Buttons") // Titre "Deck Buttons"
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (1..3).forEach { number -> // LINK BLE BUTTONS
+                        Button(
+                            onClick = {
+                                // TODO : Action à effectuer lors du clic sur le bouton
+                            }
+                        ) {
+                            Text(text = number.toString())
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            showDeckInfos = false
+                        }
+                    ) {
+                        Text(text = "CLOSE DECK")
+                    }
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -131,16 +166,15 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                         Text(text = "DELETE LAST")
                     }
 
-                FloatingActionButton(
-                    onClick = {
-                        showPopup = true
+                    FloatingActionButton(
+                        onClick = {
+                            showPopup = true
+                        }
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
                     }
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
-                }
                 }
             }
-
         } else {
             // Page Bluetooth
             Surface(
@@ -169,11 +203,11 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
         // Affichez la popup si showPopup est true
         if (showPopup) {
             StreamDeckDialog(
-                onCreateButtonClicked = { (name,shortcut) ->
+                onCreateButtonClicked = { (name, shortcut) ->
                     shortcut_name = name
                     shortcut_value = shortcut.value
                     showPopup = false
-                    val defaultButton = Pair(name, KeyboardShortcut(shortcut_name,shortcut_value)) // Remplacez le nom et la valeur par défaut
+                    val defaultButton = Pair(name, KeyboardShortcut(shortcut_name, shortcut_value)) // Remplacez le nom et la valeur par défaut
                     buttonsList.add(defaultButton)
                     // Add the button to the local storage
                     buttonsList.forEach { (buttonName, shortcutName) ->
@@ -187,8 +221,8 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                 }
             )
         }
-
     }
+
 }
 
 data class KeyboardShortcut(val name: String, val value: Int)
@@ -251,7 +285,6 @@ fun StreamDeckDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    println("selected value: ${selectedShortcut.value}")
                     if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name != "Unknown" && selectedShortcut.value != -1 ) {
                         onCreateButtonClicked(Pair(enteredName.text, selectedShortcut))
                     } else {
@@ -276,7 +309,7 @@ fun StreamDeckDialog(
 @Composable
 fun MyButton(text: String, onClick: () -> Unit) {
     Button(onClick = onClick) {
-    Text(text = text)
+        Text(text = text)
     }
 }
 
@@ -292,7 +325,9 @@ fun ButtonList(buttonsList: List<Pair<String, KeyboardShortcut>>, bluetoothContr
                 shortcut = shortcut.value,
                 onClick = {
                 },
-                bluetoothController
+                bluetoothController,
+                updateShowStates = {
+                }
             )
         }
     }
@@ -300,18 +335,27 @@ fun ButtonList(buttonsList: List<Pair<String, KeyboardShortcut>>, bluetoothContr
 
 
 @Composable
-fun MyBLEButton(text: String,shortcut: Int, onClick: () -> Unit, bluetoothController: BluetoothController? = null) {
+fun MyBLEButton(
+    text: String,
+    shortcut: Int,
+    onClick: () -> Unit,
+    bluetoothController: BluetoothController? = null,
+    updateShowStates: () -> Unit
+) {
     var cpt by remember { mutableStateOf(false) }
 
     Button(onClick = {
-        cpt = true;
+        cpt = true
     }) {
         Text(text = text)
     }
+
     if (cpt) {
         if (bluetoothController != null) {
-            BluetoothDeskContainer(bluetoothController = bluetoothController,shortcut = shortcut)
+            BluetoothDeskContainer(bluetoothController = bluetoothController, shortcut = shortcut)
+            // Mettre à jour les états showDeckInfos et showHomePage
+            updateShowStates()
         }
-        cpt = false;
+        cpt = false
     }
 }
