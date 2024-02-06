@@ -1,5 +1,6 @@
 package com.example.bluetoothsample
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
@@ -35,6 +36,14 @@ import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
 import kotlinx.coroutines.launch
 
+data class KeyboardShortcut(val name: String, val value: Int)
+
+data class StreamDeckList(
+    val name: String,
+    val subElements: List<KeyboardShortcut>,
+    var isSelected: Boolean = false
+)
+
 class HomePage : ComponentActivity() {
     private val bluetoothController = BluetoothController()
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,46 +54,17 @@ class HomePage : ComponentActivity() {
     }
 }
 
-data class KeyboardShortcut(val name: String, val value: Int)
-
-data class StreamDeckList(
-    val name: String,
-    val subElements: List<KeyboardShortcut>,
-    var isSelected: Boolean = false
-)
-fun getDefaultStreamDeck(): List<StreamDeckList> {
-    return listOf(
-        StreamDeckList(
-            "Function",
-            listOf(
-                KeyboardShortcut("F1", 58),
-                KeyboardShortcut("F2", 59),
-                KeyboardShortcut("F3", 60),
-                KeyboardShortcut("F4", 61)
-            )
-        ),
-        StreamDeckList(
-            "Arrow",
-            listOf(
-                KeyboardShortcut("->", 79),
-                KeyboardShortcut("<-", 80),
-                KeyboardShortcut("^", 81),
-                KeyboardShortcut("v", 82)
-            )
-        )
-    )
-}
-
+@SuppressLint("MutableCollectionMutableState")
 @Composable
 fun HomePageContent(bluetoothController: BluetoothController, activity: ComponentActivity) {
     var showBluetoothContent by remember { mutableStateOf(false) }
     var showHomePage by remember { mutableStateOf(true) }
     var showPopup by remember { mutableStateOf(false) }
-    var shortcut_name by remember { mutableStateOf("") }
-    var shortcut_value by remember { mutableStateOf(0) }
+    var shortcutName by remember { mutableStateOf("") }
+    var shortcutValue by remember { mutableIntStateOf(0) }
 
     var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String, KeyboardShortcut>>()) }
-    var lastButtonId by remember { mutableStateOf(0L) }
+    var lastButtonId by remember { mutableLongStateOf(0L) }
     val database = Room.databaseBuilder(
         activity.applicationContext,
         AppDatabase::class.java, "app-database"
@@ -92,7 +72,7 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     val buttonDao = database.buttonDao()
 
     DisposableEffect(Unit) {
-        // Récupérer les boutons de la base de données lors de la création du Composable
+        // Get the buttons from the local storage when the Composable is created
         activity.lifecycleScope.launch {
             val savedButtons = buttonDao.getAllButtons()
             buttonsList = savedButtons.map { buttonEntity ->
@@ -101,14 +81,15 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue)
                 )
             }.toMutableList()
-            // get the last button id
+
+            // Get the last button id
             val lastButton = savedButtons.lastOrNull()
             if (lastButton != null) {
                 lastButtonId = lastButton.id
             }
         }
         onDispose {
-            // Sauvegarder les boutons dans la base de données lors de la destruction du Composable
+            // Save the buttons in the local storage when the Composable is destroyed
             buttonsList.forEach { (buttonName, shortcutName) ->
                 activity.lifecycleScope.launch {
                     buttonDao.insertButton(
@@ -129,7 +110,6 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (showHomePage) {
-            // Page d'accueil
             Button(
                 onClick = {
                     showBluetoothContent = true
@@ -140,7 +120,8 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                 Text(text = "Bluetooth")
             }
 
-            if(!buttonsList.isEmpty()) {
+            //region Created buttons
+            if(buttonsList.isNotEmpty()) {
                 Text(
                     text = "Created buttons",
                     modifier = Modifier.padding(16.dp),
@@ -157,14 +138,16 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 items(buttonsList) { (name, shortcut) ->
-                    MyBLEButton(
-                        text = name,
+                    ButtonBluetooth(
+                        name = name,
                         shortcut = shortcut.value,
                         bluetoothController = bluetoothController,
                     )
                 }
             }
+            //endregion
 
+            //region Default Stream Deck
             Text(
                 text = "Default Stream Deck",
                 modifier = Modifier.padding(16.dp),
@@ -194,12 +177,14 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         for (subElement in element.subElements) {
-                            MyBLEButton(text = subElement.name, shortcut = subElement.value, bluetoothController = bluetoothController)
+                            ButtonBluetooth(name = subElement.name, shortcut = subElement.value, bluetoothController = bluetoothController)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.padding(6.dp))
             }
+            //endregion
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -208,10 +193,10 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FloatingActionButton(
-                        onClick = {                        // Supprimer le dernier bouton de la liste
+                        onClick = {
+                            // Delete the last button created
                             if (buttonsList.isNotEmpty()) {
                                 val lastButton = buttonsList.removeLast()
-                                // Supprimer le dernier bouton de la base de données
                                 activity.lifecycleScope.launch {
                                     buttonDao.deleteButton(
                                         ButtonEntity(
@@ -222,14 +207,14 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                                         )
                                     )
                                 }
+                                lastButtonId -= 1
                             }
-                            lastButtonId -= 1
                         }) {
                         Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete")
                         contentColorFor(backgroundColor = Color.Red)
                     }
 
-                    Spacer(modifier = Modifier.weight(1f)) // Ajoute un espace flexible pour séparer les boutons
+                    Spacer(modifier = Modifier.weight(1f))
 
                     FloatingActionButton(
                         onClick = {
@@ -241,7 +226,7 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                 }
             }
         } else {
-            // Page Bluetooth
+            // Bluetooth connexion page
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
@@ -263,18 +248,19 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
             }
         }
 
-        // Affichez la popup si showPopup est true
         if (showPopup) {
-            StreamDeckDialog(
+            DialogAddButton(
                 onCreateButtonClicked = { (name, shortcut) ->
-                    shortcut_name = name
-                    shortcut_value = shortcut.value
+                    shortcutName = name
+                    shortcutValue = shortcut.value
                     showPopup = false
                     val defaultButton = Pair(
                         name,
-                        KeyboardShortcut(shortcut_name, shortcut_value)
-                    ) // Remplacez le nom et la valeur par défaut
+                        KeyboardShortcut(shortcutName, shortcutValue)
+                    )
+                    // Add the created button to the list
                     buttonsList.add(defaultButton)
+
                     // Add the button to the local storage
                     buttonsList.forEach { (buttonName, shortcutName) ->
                         activity.lifecycleScope.launch {
@@ -295,24 +281,24 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
             )
         }
     }
-
 }
 
-
+/**
+ * Composable that displays a dialog to add a new shortcut button
+ */
 @Composable
-fun StreamDeckDialog(
+fun DialogAddButton(
     onCreateButtonClicked: (Pair<String, KeyboardShortcut>) -> Unit,
     onCancelButtonClicked: () -> Unit
 ) {
     var enteredName by remember { mutableStateOf(TextFieldValue()) }
-    var expanded by remember { mutableStateOf(false) }
-    var clicked by remember { mutableStateOf(false) }
+    var menuExpand by remember { mutableStateOf(false) }
+    var shortcutSelected by remember { mutableStateOf(KeyboardShortcut("Unknown", -1)) }
 
     val keyboardShortcuts = KeyboardReport.KeyEventMap.map { (keyCode, value) ->
         val name = KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
         KeyboardShortcut(name, value)
     }
-    var selectedShortcut by remember { mutableStateOf(KeyboardShortcut("Unknown", -1)) }
 
     AlertDialog(
         onDismissRequest = { onCancelButtonClicked() },
@@ -325,17 +311,17 @@ fun StreamDeckDialog(
                     label = { Text("Shortcut name") }
                 )
 
+                // Menu of keyboard shortcuts
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
+                    expanded = menuExpand,
+                    onDismissRequest = { menuExpand = false },
                 ) {
                     keyboardShortcuts.forEach { shortcut ->
                         Box(
                             modifier = Modifier
                                 .clickable {
-                                    selectedShortcut = shortcut
-                                    expanded = false
-                                    clicked = true
+                                    shortcutSelected = shortcut
+                                    menuExpand = false
                                 }
                                 .padding(8.dp)
                         ) {
@@ -345,12 +331,12 @@ fun StreamDeckDialog(
                 }
 
                 Button(
-                    onClick = { expanded = true },
+                    onClick = { menuExpand = true },
                     colors = ButtonDefaults.buttonColors(Color.Blue)
 
                 ) {
-                    if (clicked) {
-                        Text(text = selectedShortcut.name)
+                    if (shortcutSelected.name != "Unknown" && shortcutSelected.value != -1) {
+                        Text(text = shortcutSelected.name)
                     } else {
                         Text(text = "Select a shortcut")
                     }
@@ -358,11 +344,11 @@ fun StreamDeckDialog(
             }
         },
         confirmButton = {
+            // Save the button if the name and the shortcut are not empty
             Button(
                 onClick = {
-                    if (!enteredName.text.isNullOrEmpty() && selectedShortcut.name != "Unknown" && selectedShortcut.value != -1) {
-                        onCreateButtonClicked(Pair(enteredName.text, selectedShortcut))
-                    } else {
+                    if (enteredName.text.isNotEmpty() && shortcutSelected.name != "Unknown" && shortcutSelected.value != -1) {
+                        onCreateButtonClicked(Pair(enteredName.text, shortcutSelected))
                     }
                 },
                 colors = ButtonDefaults.buttonColors(Color.Blue)
@@ -373,6 +359,7 @@ fun StreamDeckDialog(
         },
 
         dismissButton = {
+            // Cancel the button creation
             Button(onClick = {
                 onCancelButtonClicked()
             },
@@ -384,26 +371,55 @@ fun StreamDeckDialog(
     )
 }
 
+/**
+ * Returns a list of default Stream Deck buttons linked to their respective shortcuts
+ */
+fun getDefaultStreamDeck(): List<StreamDeckList> {
+    return listOf(
+        StreamDeckList(
+            "Function",
+            listOf(
+                KeyboardShortcut("F1", 58),
+                KeyboardShortcut("F2", 59),
+                KeyboardShortcut("F3", 60),
+                KeyboardShortcut("F4", 61)
+            )
+        ),
+        StreamDeckList(
+            "Arrow",
+            listOf(
+                KeyboardShortcut("->", 79),
+                KeyboardShortcut("<-", 80),
+                KeyboardShortcut("^", 81),
+                KeyboardShortcut("v", 82)
+            )
+        )
+    )
+}
+
+/**
+ * Composable that displays a button with a BluetoothDeskContainer
+ */
 @Composable
-fun MyBLEButton(
-    text: String,
+fun ButtonBluetooth(
+    name: String,
     shortcut: Int,
     bluetoothController: BluetoothController? = null,
 ) {
-    var cpt by remember { mutableStateOf(false) }
+    var bool by remember { mutableStateOf(false) }
 
     Button(onClick = {
-        cpt = true
+        bool = true
     },
         colors = ButtonDefaults.buttonColors(Color.Black),
     ) {
-        Text(text = text, color = Color.White, fontSize = 12.sp)
+        Text(text = name, color = Color.White, fontSize = 12.sp)
     }
 
-    if (cpt) {
+    if (bool) {
         if (bluetoothController != null) {
             BluetoothDeskContainer(bluetoothController = bluetoothController, shortcut = shortcut)
         }
-        cpt = false
+        bool = false
     }
 }
