@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +28,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
 import kotlinx.coroutines.launch
@@ -68,7 +74,6 @@ fun getDefaultStreamDeck(): List<StreamDeckList> {
         )
     )
 }
-
 
 @Composable
 fun HomePageContent(bluetoothController: BluetoothController, activity: ComponentActivity) {
@@ -125,19 +130,32 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     ) {
         if (showHomePage) {
             // Page d'accueil
-            MyButton(
-                text = "Bluetooth",
+            Button(
                 onClick = {
                     showBluetoothContent = true
                     showHomePage = false
-                }
-            )
-            if (shortcut_name.isNotEmpty()) {
-                Text(text = "Nom du Shortcut : $shortcut_name")
-                Text(text = "Valeur du Shortcut : $shortcut_value")
+                },
+                colors = ButtonDefaults.buttonColors(Color.Blue),
+            ) {
+                Text(text = "Bluetooth")
             }
 
-            LazyColumn {
+            if(!buttonsList.isEmpty()) {
+                Text(
+                    text = "Created buttons",
+                    modifier = Modifier.padding(16.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 items(buttonsList) { (name, shortcut) ->
                     MyBLEButton(
                         text = name,
@@ -146,9 +164,13 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     )
                 }
             }
+
             Text(
                 text = "Default Stream Deck",
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = Color.Black
             )
 
             val myList by remember { mutableStateOf(getDefaultStreamDeck()) }
@@ -160,9 +182,10 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     onClick = {
                         isSelected = !isSelected
                         element.isSelected = isSelected
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(Color.Blue),
                 ) {
-                    Text(text = element.name)
+                    Text(text = element.name, color = Color.White, fontSize = 20.sp)
                 }
 
                 if (isSelected) {
@@ -175,35 +198,38 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                         }
                     }
                 }
+                Spacer(modifier = Modifier.padding(6.dp))
             }
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
                 contentAlignment = Alignment.BottomEnd
             ) {
-                Row {
-                    Button(onClick = {
-                        // Supprimer le dernier bouton de la liste
-                        if (buttonsList.isNotEmpty()) {
-                            val lastButton = buttonsList.removeLast()
-                            // Supprimer le dernier bouton de la base de données
-                            activity.lifecycleScope.launch {
-                                buttonDao.deleteButton(
-                                    ButtonEntity(
-                                        lastButtonId,
-                                        lastButton.first,
-                                        lastButton.second.name,
-                                        lastButton.second.value
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FloatingActionButton(
+                        onClick = {                        // Supprimer le dernier bouton de la liste
+                            if (buttonsList.isNotEmpty()) {
+                                val lastButton = buttonsList.removeLast()
+                                // Supprimer le dernier bouton de la base de données
+                                activity.lifecycleScope.launch {
+                                    buttonDao.deleteButton(
+                                        ButtonEntity(
+                                            lastButtonId,
+                                            lastButton.first,
+                                            lastButton.second.name,
+                                            lastButton.second.value
+                                        )
                                     )
-                                )
+                                }
                             }
                             lastButtonId -= 1
-                        }
-                    }) {
-                        Text(text = "DELETE LAST")
+                        }) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete")
+                        contentColorFor(backgroundColor = Color.Red)
                     }
+
+                    Spacer(modifier = Modifier.weight(1f)) // Ajoute un espace flexible pour séparer les boutons
 
                     FloatingActionButton(
                         onClick = {
@@ -227,14 +253,12 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                 ) {
                     BluetoothUiConnection(bluetoothController)
 
-                    // Bouton pour revenir à la page d'accueil
-                    MyButton(
-                        text = "Back to Home",
-                        onClick = {
-                            showBluetoothContent = false
-                            showHomePage = true
-                        }
-                    )
+                    Button(onClick = {
+                        showBluetoothContent = false
+                        showHomePage = true
+                    }) {
+                        Text(text = "Back to Home")
+                    }
                 }
             }
         }
@@ -292,13 +316,13 @@ fun StreamDeckDialog(
 
     AlertDialog(
         onDismissRequest = { onCancelButtonClicked() },
-        title = { Text("Créer un nouveau Stream Deck") },
+        title = { Text("Create a new shortcut button") },
         text = {
             Column {
                 TextField(
                     value = enteredName,
                     onValueChange = { enteredName = it },
-                    label = { Text("Nom du Stream Deck") }
+                    label = { Text("Shortcut name") }
                 )
 
                 DropdownMenu(
@@ -321,7 +345,9 @@ fun StreamDeckDialog(
                 }
 
                 Button(
-                    onClick = { expanded = true }
+                    onClick = { expanded = true },
+                    colors = ButtonDefaults.buttonColors(Color.Blue)
+
                 ) {
                     if (clicked) {
                         Text(text = selectedShortcut.name)
@@ -338,28 +364,24 @@ fun StreamDeckDialog(
                         onCreateButtonClicked(Pair(enteredName.text, selectedShortcut))
                     } else {
                     }
-                }
+                },
+                colors = ButtonDefaults.buttonColors(Color.Blue)
+
             ) {
-                Text("Créer")
+                Text("Create")
             }
         },
 
         dismissButton = {
             Button(onClick = {
                 onCancelButtonClicked()
-            }) {
-                Text("Annuler")
+            },
+                colors = ButtonDefaults.buttonColors(Color.Red)
+            ) {
+                Text("Cancel")
             }
         }
     )
-}
-
-
-@Composable
-fun MyButton(text: String, onClick: () -> Unit) {
-    Button(onClick = onClick) {
-        Text(text = text)
-    }
 }
 
 @Composable
@@ -372,13 +394,14 @@ fun MyBLEButton(
 
     Button(onClick = {
         cpt = true
-    }) {
-        Text(text = text)
+    },
+        colors = ButtonDefaults.buttonColors(Color.Black),
+    ) {
+        Text(text = text, color = Color.White, fontSize = 12.sp)
     }
 
     if (cpt) {
         if (bluetoothController != null) {
-            println("Sending the shortcut $shortcut")
             BluetoothDeskContainer(bluetoothController = bluetoothController, shortcut = shortcut)
         }
         cpt = false
