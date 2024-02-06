@@ -16,9 +16,4 @@ interface ButtonDao {
 
     @Delete
     suspend fun deleteButton(button: ButtonEntity)
-
-    // Delete all buttons
-    @Query("DELETE FROM button_table")
-    suspend fun deleteAll()
-
 }
