@@ -24,7 +24,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Button
-
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import kotlinx.coroutines.launch
 
 class HomePage : ComponentActivity() { private val bluetoothController = BluetoothController()
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,6 +38,8 @@ class HomePage : ComponentActivity() { private val bluetoothController = Bluetoo
         }
     }
 }
+
+
 @Composable
 fun HomePageContent(bluetoothController: BluetoothController, activity: ComponentActivity) {
     var showBluetoothContent by remember { mutableStateOf(false) }
@@ -43,6 +49,30 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     var shortcut_value by remember { mutableStateOf(0) }
 
     var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String,KeyboardShortcut>>()) }
+
+    val database = Room.databaseBuilder(
+        activity.applicationContext,
+        AppDatabase::class.java, "app-database"
+    ).build()
+    val buttonDao = database.buttonDao()
+
+    DisposableEffect(Unit) {
+        // Récupérer les boutons de la base de données lors de la création du Composable
+        activity.lifecycleScope.launch {
+            val savedButtons = buttonDao.getAllButtons()
+            buttonsList = savedButtons.map { buttonEntity ->
+                Pair(buttonEntity.buttonName, KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue))
+            }.toMutableList()
+        }
+        onDispose {
+            // Sauvegarder les boutons dans la base de données lors de la destruction du Composable
+            buttonsList.forEach { (buttonName, shortcutName) ->
+                activity.lifecycleScope.launch {
+                    buttonDao.insertButton(ButtonEntity(0L, buttonName, shortcutName.name, shortcutName.value))
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -123,6 +153,12 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                     showPopup = false
                     val defaultButton = Pair(name, KeyboardShortcut(shortcut_name,shortcut_value)) // Remplacez le nom et la valeur par défaut
                     buttonsList.add(defaultButton)
+                    // Add the button to the local storage
+                    buttonsList.forEach { (buttonName, shortcutName) ->
+                        activity.lifecycleScope.launch {
+                            buttonDao.insertButton(ButtonEntity(0L, buttonName, shortcutName.name, shortcutName.value))
+                        }
+                    }
                 },
                 onCancelButtonClicked = {
                     showPopup = false
@@ -224,8 +260,6 @@ fun MyButton(text: String, onClick: () -> Unit) {
 
 @Composable
 fun ButtonList(buttonsList: List<Pair<String, KeyboardShortcut>>, bluetoothController: BluetoothController?) {
-    println("ButtonList")
-
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
