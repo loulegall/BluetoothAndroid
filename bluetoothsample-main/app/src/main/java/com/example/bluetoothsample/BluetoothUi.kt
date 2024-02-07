@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.view.KeyEvent
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -100,6 +101,7 @@ fun BluetoothUiConnection(bluetoothController: BluetoothController) {
     }
 }
 @Composable
+@RequiresPermission(value = "android.permission.BLUETOOTH_ADVERTISE, android.permission.BLUETOOTH_CONNECT, android.permission.BLUETOOTH_SCAN, android.permission.BLUETOOTH_ADMIN, android.permission.BLUETOOTH")
 fun press(keyboardSender: KeyboardSender, shortcut: Shortcut, releaseModifiers: Boolean = true) {
     @SuppressLint("MissingPermission")
 

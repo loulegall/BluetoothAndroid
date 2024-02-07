@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Assurez-vous que la permission Bluetooth est accordée avant de continuer
-        ensureBluetoothPermission()
+        //ensureBluetoothPermission()
 
         bluetoothController = BluetoothController()
     }

@@ -1,10 +1,14 @@
 package com.example.bluetoothsample
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,9 +52,25 @@ class HomePage : ComponentActivity() {
     private val bluetoothController = BluetoothController()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ensureBluetoothPermission(this)
         setContent {
             HomePageContent(bluetoothController, this)
         }
+    }
+}
+private fun ensureBluetoothPermission(activity: ComponentActivity) {
+    val requestPermissionLauncher = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()){
+            isGranted: Boolean ->
+        if (isGranted) {Log.d(MainActivity.TAG, "Bluetooth connection granted")
+        } else { Log.e(MainActivity.TAG, "Bluetooth connection not granted, Bye!")
+            activity.finish()
+        }
+    }
+
+    requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_ADMIN)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        requestPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
     }
 }
 
