@@ -22,7 +22,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Deck
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeviceUnknown
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -47,6 +57,8 @@ data class StreamDeckList(
     val subElements: List<KeyboardShortcut>,
     var isSelected: Boolean = false
 )
+
+data class IconInfo(val name: String, val icon: ImageVector)
 
 class HomePage : ComponentActivity() {
     private val bluetoothController = BluetoothController()
@@ -82,8 +94,8 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     var showPopup by remember { mutableStateOf(false) }
     var shortcutName by remember { mutableStateOf("") }
     var shortcutValue by remember { mutableIntStateOf(0) }
-
-    var buttonsList by remember { mutableStateOf(mutableListOf<Pair<String, KeyboardShortcut>>()) }
+    var shortcutIcon by remember { mutableStateOf(IconInfo("Unknown", Icons.Default.DeviceUnknown)) }
+    var buttonsList by remember { mutableStateOf(mutableListOf<Triple<String, KeyboardShortcut, String>>()) }
     var lastButtonId by remember { mutableLongStateOf(0L) }
     val database = Room.databaseBuilder(
         activity.applicationContext,
@@ -96,9 +108,10 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
         activity.lifecycleScope.launch {
             val savedButtons = buttonDao.getAllButtons()
             buttonsList = savedButtons.map { buttonEntity ->
-                Pair(
+                Triple(
                     buttonEntity.buttonName,
-                    KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue)
+                    KeyboardShortcut(buttonEntity.shortcutName, buttonEntity.shortcutValue),
+                    "Filled.DeviceUnknown"
                 )
             }.toMutableList()
 
@@ -270,13 +283,17 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
 
         if (showPopup) {
             DialogAddButton(
-                onCreateButtonClicked = { (name, shortcut) ->
+                onCreateButtonClicked = { (name, shortcut, icon) ->
                     shortcutName = name
                     shortcutValue = shortcut.value
+                    shortcutIcon = icon
+                    // TODO : Add Icon to the button and save it in the local storage
+                    println("Shortcut name: $shortcutName, Shortcut value: $shortcutValue, Shortcut icon: ${shortcutIcon.name}")
                     showPopup = false
-                    val defaultButton = Pair(
+                    val defaultButton = Triple(
                         name,
-                        KeyboardShortcut(shortcutName, shortcutValue)
+                        KeyboardShortcut(shortcutName, shortcutValue),
+                        shortcutIcon.name
                     )
                     // Add the created button to the list
                     buttonsList.add(defaultButton)
@@ -303,18 +320,66 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
     }
 }
 
+@Composable
+fun IconDropdownMenu(
+    icons: List<IconInfo>,
+    onIconSelected: (ImageVector) -> Unit
+) {
+    var menuExpand by remember { mutableStateOf(false) }
+    var selectedIcon by remember { mutableStateOf(IconInfo("Unknown", Icons.Default.DeviceUnknown).icon) }
+
+    Column {
+        // Menu of icons
+        DropdownMenu(
+            expanded = menuExpand,
+            onDismissRequest = { menuExpand = false }
+        ) {
+            icons.forEach { (name, icon) ->
+                Box(
+                    modifier = Modifier
+                        .clickable {
+                            selectedIcon = icon
+                            onIconSelected(icon)
+                            menuExpand = false
+                        }
+                        .padding(8.dp)
+                ) {
+                    Row {
+                        Icon(imageVector = icon, contentDescription = null)
+                        Text(text = name)
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = { menuExpand = true },
+            colors = ButtonDefaults.buttonColors(Color.Blue)
+        ) {
+            Row {
+                Icon(imageVector = selectedIcon, contentDescription = null)
+                if (selectedIcon == Icons.Default.DeviceUnknown) {
+                    Text(text = "Selected icon")
+                } else {
+                    Text(text = selectedIcon.name)
+                }
+            }
+        }
+    }
+}
+
 /**
  * Composable that displays a dialog to add a new shortcut button
  */
 @Composable
 fun DialogAddButton(
-    onCreateButtonClicked: (Pair<String, KeyboardShortcut>) -> Unit,
+    onCreateButtonClicked: (Triple<String, KeyboardShortcut, IconInfo>) -> Unit,
     onCancelButtonClicked: () -> Unit
 ) {
     var enteredName by remember { mutableStateOf(TextFieldValue()) }
     var menuExpand by remember { mutableStateOf(false) }
     var shortcutSelected by remember { mutableStateOf(KeyboardShortcut("Unknown", -1)) }
-
+    var iconSelected by remember { mutableStateOf(IconInfo("Unknown", Icons.Default.DeviceUnknown)) }
     val keyboardShortcuts = KeyboardReport.KeyEventMap.map { (keyCode, value) ->
         val name = KeyEvent.keyCodeToString(keyCode) ?: "Unknown"
         KeyboardShortcut(name, value)
@@ -325,6 +390,23 @@ fun DialogAddButton(
         title = { Text("Create a new shortcut button") },
         text = {
             Column {
+                // Menu of icons
+                IconDropdownMenu(
+                    icons = listOf(
+                        IconInfo("Home", Icons.Default.Home),
+                        IconInfo("Menu", Icons.Default.Menu),
+                        IconInfo("Close", Icons.Default.Close),
+                        IconInfo("Arrow left", Icons.Default.ArrowBack),
+                        IconInfo("Arrow down", Icons.Default.ArrowDownward),
+                        IconInfo("Arrow right", Icons.Default.ArrowForward),
+                        IconInfo("Arrow up", Icons.Default.ArrowUpward),
+                        IconInfo("Delete", Icons.Default.Delete),
+                        IconInfo("Deck", Icons.Default.Deck)
+                    )
+                ) { iconCurrent ->
+                    println("Selected Icon: ${iconCurrent.name}, Drawable: $iconCurrent")
+                    iconSelected = IconInfo(iconCurrent.name, iconCurrent)
+                }
                 TextField(
                     value = enteredName,
                     onValueChange = { enteredName = it },
@@ -368,7 +450,7 @@ fun DialogAddButton(
             Button(
                 onClick = {
                     if (enteredName.text.isNotEmpty() && shortcutSelected.name != "Unknown" && shortcutSelected.value != -1) {
-                        onCreateButtonClicked(Pair(enteredName.text, shortcutSelected))
+                        onCreateButtonClicked(Triple(enteredName.text, shortcutSelected, iconSelected))
                     }
                 },
                 colors = ButtonDefaults.buttonColors(Color.Blue)
