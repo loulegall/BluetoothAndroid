@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +45,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Button
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -241,7 +243,21 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                                     )
                                 }
                                 lastButtonId -= 1
+
+                                val text = "Deleted button: ${lastButton.first}"
+                                val duration = Toast.LENGTH_SHORT
+
+                                val toast = Toast.makeText(activity.applicationContext, text, duration)
+                                toast.show()
                             }
+                            else {
+                                val text = "No button to delete"
+                                val duration = Toast.LENGTH_SHORT
+
+                                val toast = Toast.makeText(activity.applicationContext, text, duration)
+                                toast.show()
+                            }
+
                         }) {
                         Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete")
                         contentColorFor(backgroundColor = Color.Red)
@@ -311,9 +327,21 @@ fun HomePageContent(bluetoothController: BluetoothController, activity: Componen
                             )
                         }
                     }
+
+                    val text = "Button created: $name"
+                    val duration = Toast.LENGTH_SHORT
+
+                    val toast = Toast.makeText(activity.applicationContext, text, duration)
+                    toast.show()
                 },
                 onCancelButtonClicked = {
                     showPopup = false
+
+                    val text = "Button creation cancelled"
+                    val duration = Toast.LENGTH_SHORT
+
+                    val toast = Toast.makeText(activity.applicationContext, text, duration)
+                    toast.show()
                 }
             )
         }
